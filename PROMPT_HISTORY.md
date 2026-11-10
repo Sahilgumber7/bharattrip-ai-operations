@@ -1,32 +1,22 @@
 # AI Prompt History & Working Notes
 
-This is an informal log of the prompts, queries, and iterative reasoning I used while working through the BharatTrip task with AI. Rather than polishing this into a formal corporate report, I've kept it as an authentic working diary showing how I used AI to explore the data, test hypotheses, catch discrepancies, write scripts, and build the prototype.
+This is an informal log of the prompts, queries, and iterative reasoning I used while working through the BharatTrip task with AI. Rather than polishing this into a formal document, I've kept it as an authentic working diary showing how I used AI to explore the data, test, catch discrepancies and build the prototype.
 
 ---
 
 ### 1. Understanding the Brief & Setting Guardrails
 
-I started by feeding the PDF brief and the problem context to the AI to make sure I wasn't missing any hidden requirements or unstated constraints.
+I started by feeding the PDF brief and the Spreadsheet to the AI agent to explore the problem statement, constraints and deliverables. It also helps me get the full picture into view from a second angle
 
 **Prompt to AI:**
-> "I'm working on a take-home screening task for BharatTrip (a B2B travel company). Agents cancel bookings and ask for refunds. Two separate teams handle this: Support tracks requests in one sheet, Finance pays out and tracks in another sheet.
-> 
-> The core problem: Escalations have climbed over the last two months, but refund volume has stayed roughly flat. Leadership wants escalations brought down without adding headcount.
-> 
+> "I'm assigned a take-home screening task for BharatTrip (a B2B travel company). Agents cancel bookings and ask for refunds. Two separate teams handle this: Support tracks requests in one sheet, Finance pays out and tracks in another sheet.
+
 > Can you extract the core deliverables, constraints, and evaluate what leadership is really asking for here? Be direct—no fluff."
 
-**What came out of this:**
-The AI summarized the strict constraints:
-- Max 3-page PDF write-up covering Problem Definition, Analysis, Solution Design, and Measurement.
-- Working prototype with a one-line run instruction.
-- Zero new headcount (so any solution that says "hire 3 more support reps" is an immediate fail).
-- The brief is deliberately incomplete (e.g. no SLA docs, no written refund policy), so I need to state my assumptions clearly.
-
----
 
 ### 2. Initial Data Inspection (Sanity Checking the Spreadsheets)
 
-Before jumping to conclusions, I wanted to see what the data actually looked like. The brief mentioned four tabs: `Read_Me`, `Support_Tracker`, `Finance_Tracker`, and `Escalations`.
+Before jumping to conclusions, I wanted to see what the data actually looked like. I also wanted to check for basic hygiene issues like duplicate IDs or weird formatting.
 
 **Prompt to AI:**
 > "Write a quick Python script using pandas to inspect `BharatTrip_Refund_Data_final (5).xlsx`. Load all sheets, print out column headers, row counts, null values, and check for basic hygiene issues like duplicate IDs or weird formatting."
@@ -40,10 +30,10 @@ Before jumping to conclusions, I wanted to see what the data actually looked lik
 
 ### 3. Testing the Volume Hypothesis (Did demand actually spike?)
 
-Leadership's natural suspicion when complaints rise is usually "we got slammed with too many requests." I wanted to verify if that was true or if volume was actually flat.
+The usual suspicion when complaints rise is usually "we got slammed with too many requests." I wanted to verify if that was true or if volume was actually flat.
 
 **Prompt to AI:**
-> "Let's group Support requests, Finance payouts, and Escalations by month from February to June 2026. Parse the dates carefully (dayfirst=True). Show me the monthly counts side-by-side so we can see the exact trajectory."
+> "Group Support requests, Finance payouts, and Escalations by month from February to June 2026. Parse the dates carefully by dates. Show me the monthly counts side-by-side so we can see the exact trajectory."
 
 **The numbers:**
 - Support Intake: Feb (150), Mar (146), Apr (145), May (147), Jun (144). It is almost perfectly flat at ~146 requests a month.
@@ -51,7 +41,7 @@ Leadership's natural suspicion when complaints rise is usually "we got slammed w
 - June completed payouts collapsed to 60 (down from 115 in May).
 
 **My takeaway:**
-The volume hypothesis is completely false. The demand didn't change at all. Something internally broke down hard in May and June.
+The volume hypothesis is completely false. The demand didn't change at all. Something internally broke down around May and June.
 
 ---
 
@@ -60,9 +50,9 @@ The volume hypothesis is completely false. The demand didn't change at all. Some
 The brief noted that Support and Finance built their trackers independently and never reconciled them. I wanted to see how many tickets were in one sheet but not the other.
 
 **Prompt to AI:**
-> "Write a script to normalize the ticket IDs (strip whitespace, make regex match `RF\s*[-]?\s*(\d+)` to `RF-\1`), deduplicate both sheets, and do a full outer join between Support_Tracker and Finance_Tracker. 
+> "Start by writing a script to normalize the ticket IDs, deduplicate both sheets, and do a full outer join between Support_Tracker and Finance_Tracker. 
 > 
-> How many tickets are in both? How many exist ONLY in Support? How many exist ONLY in Finance? And how many of the 155 escalations match these missing tickets?"
+> Also find out how many tickets exists in total? How many exist ONLY in Support? How many exist ONLY in Finance? And how many of the total escalations match these missing tickets?"
 
 **What came back:**
 - Overlapping in both: 664 unique tickets.
@@ -71,7 +61,7 @@ The brief noted that Support and Finance built their trackers independently and 
 - **Direct escalations link:** 32 escalations specifically matched tickets that Support logged and closed, but Finance had zero record of.
 
 **My takeaway:**
-This explains the "Ticket shows closed, Finance has no record" complaint. Support agents were marking tickets "Closed" as soon as they replied to an email or agent, assuming someone else would take care of the payout. "Closed" to Support did not mean "Refund Paid".
+This explains the "Ticket shows closed, Finance has no record" complaint. Support agents were marking tickets "Closed" as soon as they replied to an email or agent, assuming someone else would take care of the payout. 
 
 ---
 
@@ -91,8 +81,8 @@ Escalations were hovering around 25–30 in March, April, and May, then spiked t
   - `R. Menon`'s last approval was on **June 12**, and then zero.
   - `S. Bhatt` approved only 1 payout in June.
 
-**My takeaway:**
-This was the smoking gun. The entire finance payout workflow relied on one or two individuals manually signing off tickets. When N. Iyer was away or stopped signing off after mid-June, the queue ground to a halt with no backup or automated delegation rule. Because nobody told the travel agents why their money was delayed, the agents followed up repeatedly and then escalated.
+**My deduction:**
+The entire finance payout workflow relied on one or two individuals manually signing off tickets. When N. Iyer was away or stopped signing off after mid-June, the queue ground to a halt with no backup or automated delegation rule. Because nobody told the travel agents why their money was delayed, the agents followed up repeatedly and hence the escalation.
 
 ---
 
@@ -198,7 +188,8 @@ Finally, I needed to compile the analysis into a strict 3-page PDF.
 > - Page 1: Problem Definition, macro volume table, and why flat volume + surging complaints = internal breakdown.
 > - Page 2: Deep dive analysis, tracker reconciliation table, validation of the unlogged cases (RF-1098 & RF-1099), and what we'd validate with more time.
 > - Page 3: Target solution architecture, automation vs manual trade-off matrix, prototype scope, and 30-day measurement scorecard.
-> - Replace unicode rupee symbols with 'INR' so Helvetica doesn't render glyph boxes."
+>
+ - Replace unicode rupee symbols with 'INR' so Helvetica doesn't render glyph boxes."
 
 **Verification:**
 The script generated `BharatTrip_AI_Operations_WriteUp.pdf` at exactly 3 pages with clean typography and zero overflow.
